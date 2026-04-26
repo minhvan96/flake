@@ -12,6 +12,7 @@ in
       nixos.desktop
       nixos.development
       nixos.flatpak
+      nixos.gaming
       nixos.locale
       nixos.networking
       nixos.nix
