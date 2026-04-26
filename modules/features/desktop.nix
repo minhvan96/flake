@@ -6,13 +6,29 @@
     in
     {
       services.xserver.enable = true;
-      services.displayManager.sddm.enable = true;
+
+      services.displayManager.sddm = {
+        enable = true;
+        wayland.enable = true;
+      };
+      services.displayManager.defaultSession = "plasma";
       services.desktopManager.plasma6.enable = true;
+
+      environment.sessionVariables = {
+        NIXOS_OZONE_WL = "1";
+        QT_QPA_PLATFORM = "wayland;xcb";
+        GDK_BACKEND = "wayland,x11,*";
+        SDL_VIDEODRIVER = "wayland";
+      };
 
       services.xserver.videoDrivers = [ "nvidia" ];
       hardware.graphics = {
         enable = true;
         enable32Bit = true;
+        extraPackages = with pkgs; [
+          vaapiVdpau
+          libvdpau-va-gl
+        ];
       };
 
       hardware.nvidia = {
@@ -35,6 +51,8 @@
       hardware.bluetooth.enable = true;
       services.blueman.enable = true;
 
+      services.ratbagd.enable = true;
+
       environment.systemPackages = with pkgs; [
         kdePackages.dolphin
         kdePackages.kate
@@ -51,6 +69,10 @@
         libsForQt5.qt5ct
         wl-clipboard
         xclip
+
+        piper
+        thunderbird
+        vlc
       ]
       ++ optionalKde "kcolorchooser"
       ++ optionalKde "partitionmanager"

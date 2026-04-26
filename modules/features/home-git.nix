@@ -10,6 +10,8 @@
       extraConfig = {
         core.autocrlf = "input";
         init.defaultBranch = "main";
+        credential.helper = "/run/current-system/sw/bin/git-credential-manager";
+        "credential \"https://dev.azure.com\"".useHttpPath = true;
       };
     };
   };
