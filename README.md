@@ -1,52 +1,104 @@
 # nmv NixOS Flake
 
-This is a small dendritic-style NixOS configuration for the desktop currently
-running Fedora 43 KDE.
+Personal NixOS configuration for a KDE Plasma 6 desktop with NVIDIA GPU, migrated from Fedora.
 
-The entry point is `flake.nix`. Every other `.nix` file under `modules/` is a
-top-level flake-parts module imported through `import-tree`, following the
-dendritic pattern from <https://github.com/mightyiam/dendritic>.
+Built with the [dendritic pattern](https://github.com/mightyiam/dendritic): every `.nix` file under `modules/` is a flake-parts module loaded automatically via `import-tree`. No explicit import lists to maintain.
 
-## First Boot Setup
+**Channel**: `nixos-25.11` (stable)  
+**Host**: `x86_64-linux`, hostname `nixos-desktop`
 
-After installing NixOS, copy or keep this repository at:
+---
+
+## What's included
+
+| Area | Details |
+|---|---|
+| Desktop | KDE Plasma 6, SDDM on Wayland, NVIDIA proprietary driver |
+| Boot | Lanzaboote (Secure Boot via UEFI), zram swap |
+| Audio | PipeWire with ALSA, PulseAudio, and JACK compat |
+| Networking | NetworkManager, systemd-resolved, Avahi mDNS |
+| Virtualization | KVM/QEMU via libvirtd, virt-manager, swtpm (TPM2), OVMF (UEFI guests) |
+| Containers | Podman with Docker compat, buildah, skopeo, podman-compose |
+| Gaming | Steam + Proton-GE, Gamescope, GameMode, MangoHud |
+| Security | Lanzaboote Secure Boot, KWallet, GPG + SSH agent, pcscd |
+| Flatpak | Service enabled, Flathub remote — apps installed manually |
+| Dev tools | Git, GCC, CMake, VSCode, JetBrains Rider + WebStorm, gocryptfs |
+| Dev shells | `nix develop .#dotnet` (includes Node.js), `.#python` |
+| Credentials | git-credential-manager (GitHub, Azure DevOps → KWallet) |
+| User config | home-manager: zsh + oh-my-zsh, direnv + nix-direnv, git |
+
+---
+
+## Fresh install
+
+### 1. Install NixOS
+
+Boot the NixOS installer ISO, use the graphical installer (Calamares):
+- Erase disk, single OS
+- Partition as needed (EFI + root, or EFI + root + home)
+- Set username `nmv` (or update `modules/options.nix` before rebuilding)
+
+### 2. Clone this repo
+
+After the installer finishes and you boot into the minimal NixOS system, open a terminal:
 
 ```sh
-/mnt/mics/Dev/flake
-```
-
-Then run:
-
-```sh
+mkdir -p /mnt/mics/Dev
+git clone <repo-url> /mnt/mics/Dev/flake
 cd /mnt/mics/Dev/flake
-sudo nixos-generate-config --show-hardware-config > modules/hosts/hardware-configuration.nix
-sudo nixos-rebuild switch --flake .#desktop
 ```
 
-There is also a helper script:
+### 3. Run the setup script
 
 ```sh
+chmod +x setup-after-install.sh
 ./setup-after-install.sh
 ```
 
-The generated hardware file is intentionally not pre-filled with old disk UUIDs,
-because a reinstall usually creates new UUIDs.
+This will:
+1. Generate `modules/hosts/hardware-configuration.nix` from detected hardware
+2. Run `nixos-rebuild switch --flake .#desktop`
+3. Add the Flathub remote for Flatpak
+4. Print the next steps
 
-## Post-install Manual Commands
+### 4. Set up Secure Boot (Lanzaboote)
 
-Install your .NET tools:
+The first rebuild installs Lanzaboote but keys are not enrolled yet. To complete Secure Boot:
 
 ```sh
-dotnet tool install -g dotnet-ef --version 10.0.6
-dotnet tool install -g binlogtool --version 1.0.29
+# a. Reboot into BIOS firmware settings
+#    → Find the Secure Boot section
+#    → Set to "Setup Mode" (this clears factory keys — required for enrolling custom keys)
+#    → Save and boot back into NixOS
+
+# b. Create and enroll keys
+sudo sbctl create-keys
+sudo sbctl enroll-keys --microsoft   # --microsoft keeps UEFI firmware compatibility
+
+# c. Rebuild so Lanzaboote signs the boot files with the new keys
+sudo nixos-rebuild boot --flake .#desktop
+
+# d. Verify everything is signed
+sudo sbctl verify
+
+# e. Reboot, go back into BIOS, enable Secure Boot (now with your enrolled keys)
+
+# f. After reboot, confirm status
+sbctl status
 ```
 
-Install global Node tooling if you still want it outside project-local dev
-shells:
+`sbctl status` should show `Secure Boot: enabled` and `Setup Mode: disabled`.
+
+### 5. Post-install manual steps
+
+Install .NET and Node global tools (inside the dotnet devshell):
 
 ```sh
-npm install -g nx@22.5.4
-corepack enable
+nix develop .#dotnet
+dotnet tool install -g dotnet-ef
+dotnet tool install -g binlogtool
+npm install -g nx
+exit
 ```
 
 Install VS Code extensions:
@@ -55,31 +107,101 @@ Install VS Code extensions:
 xargs -n 1 code --install-extension < docs/vscode-extensions.txt
 ```
 
-Flatpak apps are installed by the `nmv-install-flatpaks` systemd service after
-the first rebuild with network access.
-
-## Useful Commands
+Install Flatpak apps manually (Flathub remote is already added by the setup script):
 
 ```sh
-nixos-rebuild dry-run --flake .#desktop
-sudo nixos-rebuild switch --flake .#desktop
-nix flake update
-nix flake check
+flatpak install flathub app.zen_browser.zen
+flatpak install flathub com.valvesoftware.Steam   # or use the Nix Steam module
+# etc.
 ```
+
+---
+
+## Day-to-day commands
+
+```sh
+# Rebuild and switch immediately
+sudo nixos-rebuild switch --flake .#desktop
+
+# Test what would change without switching
+sudo nixos-rebuild dry-activate --flake .#desktop
+
+# Build but don't switch (safe to test before rebooting)
+sudo nixos-rebuild build --flake .#desktop
+
+# Update all flake inputs (nixpkgs, home-manager, lanzaboote, …)
+nix flake update
+
+# Update a single input
+nix flake update nixpkgs
+
+# Check the flake evaluates without errors
+nix flake check
+
+# Enter a language devshell
+nix develop .#dotnet    # .NET SDK + Node.js + pnpm/yarn/corepack
+nix develop .#python
+
+# nh (friendlier rebuild wrapper, installed by default)
+nh os switch .
+nh os build .
+```
+
+---
 
 ## Layout
 
-```text
-flake.nix
-modules/
-  flake-parts.nix
-  nixos-configurations.nix
-  options.nix
-  hosts/
-    desktop.nix
-    hardware-configuration.nix
-  features/
-    *.nix
-docs/
-  vscode-extensions.txt
 ```
+flake.nix                          # inputs: nixpkgs 25.11, home-manager, lanzaboote, flake-parts, import-tree
+modules/
+  flake-parts.nix                  # system = x86_64-linux
+  nixos-configurations.nix         # wires configurations.nixos.* → flake.nixosConfigurations
+  options.nix                      # shared options: username, hostName, stateVersion
+  devshells.nix                    # perSystem devShells: dotnet, nodejs, python
+  hosts/
+    desktop.nix                    # host definition: which feature modules to import
+    hardware-configuration.nix     # generated by nixos-generate-config (gitignored template)
+  features/
+    boot.nix                       # Lanzaboote, kernel modules, zram
+    containers.nix                 # Podman, buildah, skopeo
+    desktop.nix                    # KDE Plasma 6, NVIDIA, Wayland, audio, fonts, peripherals
+    development.nix                # build tools, CLI utils, IDEs, git-credential-manager
+    flatpak.nix                    # flatpak service + xdg-desktop-portal-kde
+    gaming.nix                     # Steam, Proton-GE, Gamescope, GameMode, MangoHud
+    home-apps.nix                  # home-manager: VSCode settings, XDG
+    home-git.nix                   # home-manager: git identity, GCM helper, Azure DevOps config
+    home-manager.nix               # home-manager NixOS module wiring
+    home-shell.nix                 # home-manager: zsh, oh-my-zsh, direnv, session paths
+    locale.nix                     # en_US.UTF-8, Asia/Ho_Chi_Minh timezone
+    networking.nix                 # NetworkManager, firewall, resolved, Avahi, firmware
+    nix.nix                        # flakes, store optimisation, GC, allowUnfree
+    security.nix                   # polkit, KWallet PAM, GPG agent, SSH agent, pcscd
+    services.nix                   # SSH, printing, ipp-usb, fwupd, udisks2, chrony, nh
+    user.nix                       # nmv user, groups, zsh shell
+    virtualization.nix             # libvirtd, QEMU/KVM, swtpm, OVMF, virt-manager
+docs/
+  vscode-extensions.txt            # list of VS Code extension IDs to install
+setup-after-install.sh             # run once after first boot
+```
+
+---
+
+## Git credential setup
+
+git-credential-manager (GCM) is installed at the system level and configured as the git helper in `~/.config/git/config` (via home-manager). It stores tokens in KWallet, which is auto-unlocked at login via SDDM PAM.
+
+On first push to a new remote, GCM will open a browser or prompt for credentials:
+
+- **GitHub**: opens browser for OAuth
+- **Azure DevOps**: opens browser; `useHttpPath = true` is set so credentials are scoped per-organisation
+
+No manual configuration needed.
+
+---
+
+## Notes
+
+- `hardware-configuration.nix` is a placeholder — the setup script overwrites it with detected hardware. Do not commit machine-specific UUIDs back into the repo if you plan to use this flake on multiple machines.
+- JetBrains Toolbox path (`~/.local/share/JetBrains/Toolbox/scripts`) is in `$PATH` via home-manager. If you prefer Toolbox over the Nix-managed IDEs, replace `jetbrains.rider` and `jetbrains.webstorm` in `development.nix` with `pkgs.jetbrains-toolbox`.
+- Proton-GE appears in Steam under **Settings → Compatibility → Enable Steam Play for all titles**, then select `GE-Proton` from the dropdown per game.
+- To launch a game with MangoHud: add `MANGOHUD=1 %command%` to the game's Steam launch options.

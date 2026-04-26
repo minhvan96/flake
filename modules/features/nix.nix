@@ -20,10 +20,6 @@
 
     nixpkgs.config.allowUnfree = true;
 
-    environment.variables = {
-      DOTNET_ROOT = "/run/current-system/sw/share/dotnet";
-    };
-
     time.timeZone = "Asia/Ho_Chi_Minh";
     system.stateVersion = config.stateVersion;
   };

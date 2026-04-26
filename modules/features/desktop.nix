@@ -18,7 +18,6 @@
         NIXOS_OZONE_WL = "1";
         QT_QPA_PLATFORM = "wayland;xcb";
         GDK_BACKEND = "wayland,x11,*";
-        SDL_VIDEODRIVER = "wayland";
       };
 
       services.xserver.videoDrivers = [ "nvidia" ];
@@ -53,6 +52,13 @@
 
       services.ratbagd.enable = true;
 
+      fonts.packages = with pkgs; [
+        noto-fonts
+        noto-fonts-cjk-sans
+        liberation_ttf
+        jetbrains-mono
+      ];
+
       environment.systemPackages = with pkgs; [
         kdePackages.dolphin
         kdePackages.kate
@@ -64,7 +70,6 @@
         kdePackages.yakuake
         kdePackages.gwenview
         kdePackages.filelight
-        kdePackages.kdeconnect-kde
         kdePackages.kio-extras
         libsForQt5.qt5ct
         wl-clipboard
@@ -79,6 +84,7 @@
       ++ optionalKde "kwalletmanager"
       ++ optionalKde "kio-admin"
       ++ optionalKde "plasma-systemmonitor"
-      ++ optionalKde "plasma-browser-integration";
+      ++ optionalKde "plasma-browser-integration"
+      ++ optionalKde "print-manager";
     };
 }

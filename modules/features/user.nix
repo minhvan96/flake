@@ -18,6 +18,7 @@
           "podman"
           "video"
           "audio"
+          "input"
         ];
       };
 

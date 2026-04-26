@@ -48,7 +48,6 @@
         gocryptfs
         git-credential-manager
 
-        vscode
         jetbrains.rider
         jetbrains.webstorm
       ];

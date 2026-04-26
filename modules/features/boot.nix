@@ -34,6 +34,8 @@
         "nvidia-drm.modeset=1"
       ];
 
+      boot.supportedFilesystems = [ "ntfs" ];
+
       environment.systemPackages = [ pkgs.sbctl ];
 
       zramSwap.enable = true;

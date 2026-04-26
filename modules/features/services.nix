@@ -5,9 +5,13 @@
       settings.PasswordAuthentication = false;
     };
 
-    services.printing.enable = true;
+    services.printing = {
+      enable = true;
+      drivers = [ ];
+    };
+    services.ipp-usb.enable = true;
+
     services.fwupd.enable = true;
-    services.thermald.enable = true;
     services.upower.enable = true;
     services.udisks2.enable = true;
     services.smartd.enable = true;
